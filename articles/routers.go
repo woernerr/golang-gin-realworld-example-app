@@ -5,6 +5,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gothinkster/golang-gin-realworld-example-app/common"
 	"github.com/gothinkster/golang-gin-realworld-example-app/users"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
 	"net/http"
 	"strconv"
@@ -241,11 +243,16 @@ func ArticleCommentList(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"comments": serializer.Response()})
 }
 func TagList(c *gin.Context) {
-	tagModels, err := getAllTags()
+	tagModels, err := getAllTags(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusNotFound, common.NewError("articles", errors.New("Invalid param")))
+		trace.SpanFromContext(c.Request.Context()).SetAttributes(attribute.String("app.tags.outcome", "query_failed"))
 		return
 	}
 	serializer := TagsSerializer{c, tagModels}
 	c.JSON(http.StatusOK, gin.H{"tags": serializer.Response()})
+	trace.SpanFromContext(c.Request.Context()).SetAttributes(
+		attribute.String("app.tags.outcome", "returned"),
+		attribute.Int("app.tags.returned_count", len(tagModels)),
+	)
 }
