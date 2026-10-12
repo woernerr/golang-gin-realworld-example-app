@@ -1,13 +1,18 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	"go.opentelemetry.io/otel"
 
 	"github.com/gothinkster/golang-gin-realworld-example-app/articles"
 	"github.com/gothinkster/golang-gin-realworld-example-app/common"
+	"github.com/gothinkster/golang-gin-realworld-example-app/instrumentation"
 	"github.com/gothinkster/golang-gin-realworld-example-app/users"
 	"gorm.io/gorm"
 )
@@ -23,6 +28,10 @@ func Migrate(db *gorm.DB) {
 
 func main() {
 
+	shutdown, setupErr := instrumentation.Setup(context.Background(), "golang-gin-realworld-example-app")
+	if setupErr != nil {
+		otel.Handle(setupErr)
+	}
 	db := common.Init()
 	Migrate(db)
 	sqlDB, err := db.DB()
@@ -32,7 +41,17 @@ func main() {
 		defer sqlDB.Close()
 	}
 
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdown(ctx); err != nil {
+			otel.Handle(err)
+		}
+	}()
+
 	r := gin.Default()
+	r.Use(otelgin.Middleware("golang-gin-realworld-example-app"))
+	r.Use(instrumentation.RouteNameMiddleware())
 
 	// Disable automatic redirect for trailing slashes
 	// This prevents POST body from being lost during redirects

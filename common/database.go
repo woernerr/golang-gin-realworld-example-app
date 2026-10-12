@@ -5,9 +5,11 @@ import (
 	"os"
 	"path/filepath"
 
+	"go.opentelemetry.io/otel"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	"gorm.io/plugin/opentelemetry/tracing"
 )
 
 type Database struct {
@@ -57,6 +59,11 @@ func Init() *gorm.DB {
 	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		fmt.Println("db err: (Init) ", err)
+	}
+	if err == nil {
+		if err := db.Use(tracing.NewPlugin(tracing.WithoutQueryVariables(), tracing.WithoutMetrics())); err != nil {
+			otel.Handle(err)
+		}
 	}
 	sqlDB, err := db.DB()
 	if err != nil {
