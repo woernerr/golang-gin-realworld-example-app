@@ -1,6 +1,7 @@
 package articles
 
 import (
+	"context"
 	"strconv"
 
 	"github.com/gothinkster/golang-gin-realworld-example-app/common"
@@ -167,8 +168,11 @@ func (self *ArticleModel) getComments() error {
 	return err
 }
 
-func getAllTags() ([]TagModel, error) {
+func getAllTags(contexts ...context.Context) ([]TagModel, error) {
 	db := common.GetDB()
+	if len(contexts) > 0 {
+		db = db.WithContext(contexts[0])
+	}
 	var models []TagModel
 	err := db.Find(&models).Error
 	return models, err
